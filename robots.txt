@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://playnet-afk.github.io/kahraba-check/sitemap-index.xml
