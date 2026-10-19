@@ -1,0 +1,89 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import { adresseAbsolue, chemin } from "../../lib/url";
+
+const guides = (await getCollection("guides")).sort((a, b) => a.data.ordre - b.data.ordre);
+
+const donneesStructurees = [
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Guides de la facture d'électricité des entreprises",
+    url: adresseAbsolue("guides/", Astro.site),
+    hasPart: guides.map((guide) => ({
+      "@type": "Article",
+      headline: guide.data.titre,
+      url: adresseAbsolue(`guides/${guide.id}/`, Astro.site),
+    })),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: adresseAbsolue("", Astro.site) },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Guides",
+        item: adresseAbsolue("guides/", Astro.site),
+      },
+    ],
+  },
+];
+---
+
+<Base
+  titre="Guides : réduire la facture d'électricité de votre entreprise"
+  description="Guides pratiques pour les entreprises au Maroc : lire une facture moyenne tension, régler la puissance souscrite, supprimer l'énergie réactive, autoproduction loi 82-21."
+  donneesStructurees={donneesStructurees}
+>
+  <section class="section">
+    <div class="conteneur">
+      <p class="surtitre">Guides pratiques</p>
+      <h1>Réduire la facture d'électricité de votre entreprise</h1>
+      <p class="chapeau">
+        Des explications concrètes, chiffrées avec les tarifs en vigueur, pour comprendre chaque
+        ligne de votre facture et savoir où se trouvent les économies.
+      </p>
+      <ul class="liste">
+        {guides.map((guide) => (
+          <li class="carte">
+            <h2>
+              <a href={chemin(`guides/${guide.id}/`)}>{guide.data.titre}</a>
+            </h2>
+            <p>{guide.data.description}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .liste {
+    list-style: none;
+    padding: 0;
+    margin: 28px 0 0;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  }
+
+  .liste h2 {
+    font-size: 1.25rem;
+  }
+
+  .liste a {
+    text-decoration: none;
+  }
+
+  .liste a:hover {
+    text-decoration: underline;
+  }
+
+  .liste p {
+    color: var(--muted);
+    margin: 0;
+  }
+</style>

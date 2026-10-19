@@ -1,0 +1,753 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../config";
+import { EXEMPLES } from "../data/exemples";
+import { formaterPourcent, formaterTarif } from "../lib/format";
+import { HYPOTHESES, SOURCE_TARIF, TARIF_MT_2026 } from "../lib/tarifs";
+import { adresseAbsolue } from "../lib/url";
+
+const LIGNES = 12;
+const COLONNES = [
+  { champ: "jours", libelle: "Jours", aide: "Nombre de jours de la période" },
+  { champ: "kwhPointe", libelle: "kWh pointe", aide: "Énergie active en heures de pointe" },
+  { champ: "kwhPleines", libelle: "kWh pleines", aide: "Énergie active en heures pleines" },
+  { champ: "kwhCreuses", libelle: "kWh creuses", aide: "Énergie active en heures creuses" },
+  { champ: "puissanceMaxKva", libelle: "Pmax (kVA)", aide: "Puissance maximale atteinte" },
+  { champ: "penaliteReactiveDh", libelle: "Réactive (DH)", aide: "Pénalité d'énergie réactive" },
+  { champ: "depassementDh", libelle: "Dépass. (DH)", aide: "Dépassements de puissance facturés" },
+  {
+    champ: "totalTtcDh",
+    libelle: "Total TTC (DH)",
+    aide: "Montant total de la facture, facultatif",
+  },
+] as const;
+
+const donneesStructurees = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: `Diagnostic de facture d'électricité ${SITE.nom}`,
+  url: adresseAbsolue("diagnostic/", Astro.site),
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Tous (navigateur web)",
+  inLanguage: SITE.langue,
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "MAD" },
+  description:
+    "Calcule ce qu'une entreprise paie en trop sur ses factures d'électricité moyenne tension au Maroc.",
+};
+---
+
+<Base
+  titre="Diagnostic gratuit de facture d'électricité moyenne tension"
+  description="Saisissez vos 12 dernières factures d'électricité moyenne tension : puissance souscrite, énergie réactive et heures de pointe. L'outil chiffre ce que vous payez en trop, gratuitement."
+  donneesStructurees={donneesStructurees}
+>
+  <section class="section">
+    <div class="conteneur">
+      <p class="surtitre">Outil gratuit · calcul dans votre navigateur</p>
+      <h1>Diagnostic de vos factures d'électricité</h1>
+      <p class="chapeau">
+        Recopiez les chiffres de vos factures moyenne tension, une ligne par mois. Douze mois
+        donnent le résultat le plus fiable, mais l'outil fonctionne dès une facture. Rien n'est
+        envoyé : vos chiffres restent sur cet appareil.
+      </p>
+
+      <form id="formulaire" class="carte formulaire" novalidate>
+        <div class="entete-formulaire">
+          <label class="champ-puissance">
+            <span>Puissance souscrite (kVA)</span>
+            <input
+              name="puissanceSouscriteKva"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="ex. 250"
+              required
+            />
+          </label>
+          <div class="outils">
+            <label>
+              <span class="visuellement-cache">Remplir avec un exemple fictif</span>
+              <select id="exemple">
+                <option value="">Remplir avec un exemple…</option>
+                {EXEMPLES.map((exemple) => (
+                  <option value={exemple.id}>
+                    {exemple.secteur} : {exemple.nom}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" class="bouton secondaire" id="vider">
+              Vider le tableau
+            </button>
+          </div>
+        </div>
+
+        <div class="defilement" role="region" aria-label="Tableau des factures" tabindex="0">
+          <table>
+            <caption class="visuellement-cache">Une ligne par facture mensuelle</caption>
+            <thead>
+              <tr>
+                <th scope="col">Mois</th>
+                {COLONNES.map(({ libelle, aide }) => (
+                  <th scope="col" title={aide}>
+                    {libelle}
+                  </th>
+                ))}
+                <th scope="col" title="Cochez si la facture indique un relevé estimé">
+                  Estimé
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: LIGNES }, (_, i) => (
+                <tr data-ligne={i}>
+                  <td>
+                    <input
+                      name={`mois-${i}`}
+                      aria-label={`Mois de la facture ${i + 1}`}
+                      placeholder={`Mois ${i + 1}`}
+                      autocomplete="off"
+                    />
+                  </td>
+                  {COLONNES.map(({ champ, aide }) => (
+                    <td>
+                      <input
+                        name={`${champ}-${i}`}
+                        aria-label={`${aide}, facture ${i + 1}`}
+                        inputmode="decimal"
+                        autocomplete="off"
+                      />
+                    </td>
+                  ))}
+                  <td class="case">
+                    <input
+                      type="checkbox"
+                      name={`releveEstime-${i}`}
+                      aria-label={`Relevé estimé, facture ${i + 1}`}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="erreurs" class="erreurs" role="alert" hidden></div>
+
+        <div class="pied-formulaire">
+          <button type="submit" class="bouton">
+            Calculer ce que je perds
+          </button>
+          <p class="note">
+            Votre saisie est gardée sur cet appareil pour la prochaine visite. Le bouton « Vider le
+            tableau » l'efface.
+          </p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="resultat" class="resultat" aria-live="polite" hidden>
+    <div class="conteneur">
+      <div class="compteur">
+        <p class="libelle">Argent perdu chaque année</p>
+        <p class="montant chiffre" data-valeur="perteTotaleDh"></p>
+        <p class="libelle">
+          sur <span data-valeur="totalPayeDh"></span> payés par an ·
+          <span data-valeur="partPerdue"></span> de la facture
+        </p>
+      </div>
+
+      <div class="grille indicateurs">
+        <div class="carte">
+          <p class="surtitre">Puissance</p>
+          <p class="valeur chiffre" data-valeur="economiePuissanceDh"></p>
+          <p class="note" data-valeur="textePuissance"></p>
+        </div>
+        <div class="carte">
+          <p class="surtitre">Énergie réactive</p>
+          <p class="valeur chiffre" data-valeur="economieReactiveDh"></p>
+          <p class="note">
+            {formaterPourcent(HYPOTHESES.partReactiveEvitable)} des pénalités supprimées par des
+            condensateurs
+          </p>
+        </div>
+        <div class="carte">
+          <p class="surtitre">Heures de pointe</p>
+          <p class="valeur chiffre" data-valeur="economiePointeDh"></p>
+          <p class="note">
+            {formaterPourcent(HYPOTHESES.partPointeDeplacable)} de la pointe décalée en heures
+            pleines
+          </p>
+        </div>
+      </div>
+
+      <h2>Ce qu'il faut faire</h2>
+      <ol id="conseils" class="conseils"></ol>
+      <p id="aucun-conseil" class="note" hidden>
+        Aucune perte significative détectée : vos réglages semblent corrects. Pensez à vérifier
+        chaque nouvelle facture.
+      </p>
+
+      <div id="bloc-anomalies" hidden>
+        <h2>Points à vérifier sur vos factures</h2>
+        <ul id="anomalies" class="anomalies"></ul>
+      </div>
+
+      <div class="carte offre">
+        <div>
+          <h2>Récupérer cet argent sans rien avancer</h2>
+          <p>
+            Nous nous occupons des démarches et nous ne sommes payés que sur les économies
+            constatées : {formaterPourcent(HYPOTHESES.commission)} de la première année, soit
+            environ <strong class="chiffre" data-valeur="commissionDh"></strong>. Vous gardez{" "}
+            <strong class="chiffre" data-valeur="resteClient"></strong> la première année, puis la
+            totalité les années suivantes.
+          </p>
+        </div>
+        <div class="actions-offre">
+          <a id="contact-whatsapp" class="bouton" hidden>
+            Envoyer ce résultat sur WhatsApp
+          </a>
+          <a id="contact-email" class="bouton secondaire" hidden>
+            Envoyer par e-mail
+          </a>
+          <button type="button" class="bouton secondaire" id="imprimer">
+            Imprimer ou enregistrer en PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="conteneur prose">
+      <h2>Comment le calcul est fait</h2>
+      <ul>
+        <li>
+          <strong>Puissance.</strong> La puissance conseillée est le pic réellement atteint sur la
+          période, majoré de {formaterPourcent(HYPOTHESES.margePuissance)}. Chaque kVA payé
+          au-dessus coûte {formaterTarif(TARIF_MT_2026.primeFixeDhParKvaAn)} DH par an de prime
+          fixe. Si des dépassements sont facturés, l'outil compare leur coût à celui d'une puissance
+          plus haute.
+        </li>
+        <li>
+          <strong>Énergie réactive.</strong>
+          {formaterPourcent(HYPOTHESES.partReactiveEvitable)} des pénalités sont considérées comme
+          évitables avec une batterie de condensateurs bien dimensionnée.
+        </li>
+        <li>
+          <strong>Heures de pointe.</strong>
+          {formaterPourcent(HYPOTHESES.partPointeDeplacable)} de la consommation de pointe est
+          supposée décalable en heures pleines, soit un gain de{" "}
+          {formaterTarif(TARIF_MT_2026.kwhPointeDh - TARIF_MT_2026.kwhPleinesDh)} DH par kWh décalé.
+        </li>
+        <li>
+          <strong>Moins de 12 factures.</strong> Les montants sont ramenés à une année complète.
+        </li>
+      </ul>
+      <p class="note">
+        Tarifs :{" "}
+        <a href={SOURCE_TARIF.url} rel="noopener">
+          {SOURCE_TARIF.libelle}
+        </a>
+        , consultée le {SOURCE_TARIF.consulteLe}. Prix du kWh TTC : pointe{" "}
+        {formaterTarif(TARIF_MT_2026.kwhPointeDh)} DH, pleines{" "}
+        {formaterTarif(TARIF_MT_2026.kwhPleinesDh)} DH, creuses{" "}
+        {formaterTarif(TARIF_MT_2026.kwhCreusesDh)} DH. Les conditions de votre distributeur peuvent
+        différer : ce diagnostic donne un ordre de grandeur, à confirmer sur vos factures
+        originales.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { lienEmail, lienWhatsapp } from "../config";
+  import { trouver } from "../lib/dom";
+  import { EXEMPLES } from "../data/exemples";
+  import { DonneesInvalides, diagnostiquer, type Diagnostic } from "../lib/diagnostic";
+  import { formaterDh, formaterNombre, formaterPourcent } from "../lib/format";
+  import { conseils, decrireAnomalie } from "../lib/rapport";
+  import { CHAMPS_SAISIS, lireLignes, lireNombre, type LigneSaisie } from "../lib/saisie";
+
+  const CLE_BROUILLON = "kahraba-check:diagnostic";
+  const LIGNES = 12;
+
+  const formulaire = trouver("#formulaire", HTMLFormElement);
+  const selectExemple = trouver("#exemple", HTMLSelectElement);
+  const boutonVider = trouver("#vider", HTMLButtonElement);
+  const boutonImprimer = trouver("#imprimer", HTMLButtonElement);
+  const blocErreurs = trouver("#erreurs", HTMLDivElement);
+  const blocResultat = trouver("#resultat", HTMLElement);
+  const listeConseils = trouver("#conseils", HTMLOListElement);
+  const aucunConseil = trouver("#aucun-conseil", HTMLParagraphElement);
+  const blocAnomalies = trouver("#bloc-anomalies", HTMLDivElement);
+  const listeAnomalies = trouver("#anomalies", HTMLUListElement);
+  const lienWa = trouver("#contact-whatsapp", HTMLAnchorElement);
+  const lienMail = trouver("#contact-email", HTMLAnchorElement);
+
+  const champ = (nom: string): HTMLInputElement => {
+    const element = formulaire.elements.namedItem(nom);
+    if (!(element instanceof HTMLInputElement)) throw new Error(`Champ introuvable : ${nom}`);
+    return element;
+  };
+
+  interface Brouillon {
+    puissanceSouscriteKva: string;
+    lignes: LigneSaisie[];
+  }
+
+  function lireFormulaire(): Brouillon {
+    const lignes = Array.from({ length: LIGNES }, (_, i): LigneSaisie => {
+      const valeurs = Object.fromEntries(
+        CHAMPS_SAISIS.map((nom) => [nom, champ(`${nom}-${i}`).value]),
+      ) as Record<(typeof CHAMPS_SAISIS)[number], string>;
+      return {
+        ...valeurs,
+        mois: champ(`mois-${i}`).value,
+        releveEstime: champ(`releveEstime-${i}`).checked,
+      };
+    });
+    return { puissanceSouscriteKva: champ("puissanceSouscriteKva").value, lignes };
+  }
+
+  function remplirFormulaire(brouillon: Brouillon): void {
+    champ("puissanceSouscriteKva").value = brouillon.puissanceSouscriteKva;
+    for (let i = 0; i < LIGNES; i++) {
+      const ligne = brouillon.lignes[i];
+      champ(`mois-${i}`).value = ligne?.mois ?? "";
+      champ(`releveEstime-${i}`).checked = ligne?.releveEstime ?? false;
+      for (const nom of CHAMPS_SAISIS) {
+        champ(`${nom}-${i}`).value = ligne?.[nom] ?? "";
+      }
+    }
+  }
+
+  // Le stockage local peut être bloqué (navigation privée, réglages) : l'outil fonctionne sans.
+  function enregistrerBrouillon(): void {
+    try {
+      localStorage.setItem(CLE_BROUILLON, JSON.stringify(lireFormulaire()));
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+
+  function restaurerBrouillon(): void {
+    try {
+      const brut = localStorage.getItem(CLE_BROUILLON);
+      if (brut !== null) remplirFormulaire(JSON.parse(brut) as Brouillon);
+    } catch {
+      /* brouillon absent ou illisible */
+    }
+  }
+
+  function effacerBrouillon(): void {
+    try {
+      localStorage.removeItem(CLE_BROUILLON);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+
+  function chargerExemple(id: string): void {
+    const exemple = EXEMPLES.find((e) => e.id === id);
+    if (exemple === undefined) return;
+    remplirFormulaire({
+      puissanceSouscriteKva: String(exemple.puissanceSouscriteKva),
+      lignes: exemple.releves.map((r) => ({
+        mois: r.mois,
+        jours: String(r.jours),
+        releveEstime: r.releveEstime,
+        kwhPointe: String(r.kwhPointe),
+        kwhPleines: String(r.kwhPleines),
+        kwhCreuses: String(r.kwhCreuses),
+        puissanceMaxKva: String(r.puissanceMaxKva),
+        penaliteReactiveDh: String(r.penaliteReactiveDh),
+        depassementDh: String(r.depassementDh),
+        totalTtcDh: r.totalTtcDh === undefined ? "" : String(r.totalTtcDh),
+      })),
+    });
+  }
+
+  function afficherErreurs(erreurs: readonly string[]): void {
+    blocErreurs.replaceChildren();
+    const titre = document.createElement("p");
+    titre.textContent = "Le calcul n'a pas pu être fait :";
+    const liste = document.createElement("ul");
+    for (const erreur of erreurs) {
+      const element = document.createElement("li");
+      element.textContent = erreur;
+      liste.append(element);
+    }
+    blocErreurs.append(titre, liste);
+    blocErreurs.hidden = false;
+    blocResultat.hidden = true;
+    blocErreurs.focus();
+  }
+
+  function ecrire(nom: string, texte: string): void {
+    document.querySelectorAll(`[data-valeur="${nom}"]`).forEach((element) => {
+      element.textContent = texte;
+    });
+  }
+
+  function texteReglage(d: Diagnostic, souscrite: number): string {
+    switch (d.reglagePuissance) {
+      case "trop-haute":
+        return `${formaterNombre(souscrite)} kVA souscrits pour un pic de ${formaterNombre(d.puissanceMaxKva)} kVA`;
+      case "trop-basse":
+        return `Dépassements facturés : ${formaterNombre(d.puissanceConseilleeKva)} kVA conseillés`;
+      case "correcte":
+        return "Puissance souscrite bien réglée";
+    }
+  }
+
+  function afficherResultat(d: Diagnostic, souscrite: number): void {
+    ecrire("perteTotaleDh", formaterDh(d.perteTotaleDh));
+    ecrire("totalPayeDh", formaterDh(d.totalPayeDh));
+    ecrire("partPerdue", formaterPourcent(d.totalPayeDh > 0 ? d.perteTotaleDh / d.totalPayeDh : 0));
+    ecrire("economiePuissanceDh", formaterDh(d.economiePuissanceDh));
+    ecrire("economieReactiveDh", formaterDh(d.economieReactiveDh));
+    ecrire("economiePointeDh", formaterDh(d.economiePointeDh));
+    ecrire("textePuissance", texteReglage(d, souscrite));
+    ecrire("commissionDh", formaterDh(d.commissionDh));
+    ecrire("resteClient", formaterDh(d.perteTotaleDh - d.commissionDh));
+
+    const liste = conseils(d, souscrite);
+    listeConseils.replaceChildren(
+      ...liste.map(({ titre, texte, montantDh }) => {
+        const element = document.createElement("li");
+        const entete = document.createElement("p");
+        const nom = document.createElement("strong");
+        nom.textContent = titre;
+        const montant = document.createElement("span");
+        montant.className = "chiffre gain";
+        montant.textContent = `+ ${formaterDh(montantDh)} / an`;
+        entete.append(nom, montant);
+        const detail = document.createElement("p");
+        detail.className = "note";
+        detail.textContent = texte;
+        element.append(entete, detail);
+        return element;
+      }),
+    );
+    aucunConseil.hidden = liste.length > 0;
+
+    listeAnomalies.replaceChildren(
+      ...d.anomalies.map((anomalie) => {
+        const element = document.createElement("li");
+        element.textContent = decrireAnomalie(anomalie);
+        return element;
+      }),
+    );
+    blocAnomalies.hidden = d.anomalies.length === 0;
+
+    const message = `Bonjour, le diagnostic Kahraba Check estime ma perte à ${formaterDh(d.perteTotaleDh)} par an (puissance souscrite ${formaterNombre(souscrite)} kVA). Pouvez-vous vérifier mes factures ?`;
+    const wa = lienWhatsapp(message);
+    const mail = lienEmail("Diagnostic Kahraba Check");
+    lienWa.hidden = wa === null;
+    lienMail.hidden = mail === null;
+    if (wa !== null) lienWa.href = wa;
+    if (mail !== null) lienMail.href = `${mail}&body=${encodeURIComponent(message)}`;
+
+    blocErreurs.hidden = true;
+    blocResultat.hidden = false;
+    blocResultat.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function calculer(): void {
+    const saisie = lireFormulaire();
+    const souscrite = lireNombre(saisie.puissanceSouscriteKva);
+    const lecture = lireLignes(saisie.lignes);
+    const erreurs: string[] = [];
+    if (souscrite === null || Number.isNaN(souscrite) || souscrite <= 0) {
+      erreurs.push("Indiquez la puissance souscrite en kVA (elle figure en haut de la facture).");
+    }
+    if (!lecture.ok) erreurs.push(...lecture.erreurs);
+    if (erreurs.length > 0 || souscrite === null || !lecture.ok) {
+      afficherErreurs(erreurs);
+      return;
+    }
+    try {
+      afficherResultat(
+        diagnostiquer({ puissanceSouscriteKva: souscrite, releves: lecture.releves }),
+        souscrite,
+      );
+    } catch (erreur) {
+      if (erreur instanceof DonneesInvalides) afficherErreurs(erreur.erreurs);
+      else throw erreur;
+    }
+  }
+
+  blocErreurs.tabIndex = -1;
+  restaurerBrouillon();
+
+  formulaire.addEventListener("input", enregistrerBrouillon);
+  formulaire.addEventListener("submit", (evenement) => {
+    evenement.preventDefault();
+    calculer();
+  });
+  selectExemple.addEventListener("change", () => {
+    chargerExemple(selectExemple.value);
+    selectExemple.value = "";
+    enregistrerBrouillon();
+    calculer();
+  });
+  boutonVider.addEventListener("click", () => {
+    formulaire.reset();
+    effacerBrouillon();
+    blocResultat.hidden = true;
+    blocErreurs.hidden = true;
+  });
+  boutonImprimer.addEventListener("click", () => window.print());
+</script>
+
+<style>
+  .formulaire {
+    margin-top: 28px;
+    padding: clamp(16px, 3vw, 24px);
+  }
+
+  .entete-formulaire {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .champ-puissance {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+  }
+
+  .champ-puissance input {
+    width: min(100%, 200px);
+    font-size: 1.1rem;
+  }
+
+  .outils {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .outils label {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .outils select {
+    width: 100%;
+  }
+
+  input,
+  select {
+    font: inherit;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+
+  select {
+    max-width: 100%;
+  }
+
+  .defilement {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 980px;
+  }
+
+  th {
+    font-size: 0.78rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 10px 6px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td input:not([type="checkbox"]) {
+    width: 100%;
+    min-width: 76px;
+    min-height: 38px;
+    padding: 6px 8px;
+    font-family: var(--f-data);
+    font-size: 0.88rem;
+  }
+
+  td:first-child input {
+    min-width: 110px;
+    font-family: var(--f-body);
+  }
+
+  .case {
+    text-align: center;
+  }
+
+  .case input {
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    accent-color: var(--accent);
+  }
+
+  .erreurs {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--loss-soft);
+    color: var(--ink);
+    border: 1px solid var(--loss);
+  }
+
+  .erreurs :global(p) {
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+
+  .erreurs :global(ul) {
+    margin: 0;
+    padding-left: 1.2em;
+  }
+
+  .pied-formulaire {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin-top: 18px;
+  }
+
+  .pied-formulaire .note {
+    margin: 0;
+    flex: 1 1 260px;
+  }
+
+  .resultat {
+    padding-bottom: 20px;
+    scroll-margin-top: 20px;
+  }
+
+  .compteur {
+    background: var(--meter);
+    color: #fff;
+    border-radius: 18px;
+    padding: clamp(20px, 4vw, 32px);
+    margin-bottom: 16px;
+  }
+
+  .compteur .libelle {
+    font-family: var(--f-data);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--meter-muted);
+    margin: 0;
+  }
+
+  .compteur .montant {
+    color: var(--meter-ink);
+    font-size: clamp(2.4rem, 8vw, 4rem);
+    font-weight: 600;
+    line-height: 1.05;
+    margin: 8px 0;
+  }
+
+  .indicateurs {
+    margin-bottom: 32px;
+  }
+
+  .indicateurs .valeur {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--loss);
+    margin: 0 0 4px;
+  }
+
+  .indicateurs .note {
+    margin: 0;
+  }
+
+  .conseils {
+    padding-left: 1.3em;
+    margin: 0 0 32px;
+  }
+
+  .conseils :global(li) {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conseils :global(li > p:first-child) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+    margin: 0 0 4px;
+  }
+
+  .conseils :global(.note) {
+    margin: 0;
+  }
+
+  .anomalies {
+    padding-left: 1.2em;
+    margin: 0 0 32px;
+  }
+
+  .offre {
+    display: grid;
+    gap: 20px;
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .actions-offre {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  @media print {
+    .section,
+    .actions-offre {
+      display: none;
+    }
+
+    .resultat {
+      display: block;
+    }
+
+    .compteur {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+  }
+</style>

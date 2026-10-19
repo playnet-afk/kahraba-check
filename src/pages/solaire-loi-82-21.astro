@@ -1,0 +1,333 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../config";
+import { formaterNombre, formaterTarif } from "../lib/format";
+import { SEUIL_AUTORISATION_KW, SEUIL_DECLARATION_KW } from "../lib/solaire";
+import { TARIF_MT_2026 } from "../lib/tarifs";
+import { adresseAbsolue, chemin } from "../lib/url";
+
+const donneesStructurees = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Simulateur solaire loi 82-21 pour entreprises",
+    url: adresseAbsolue("solaire-loi-82-21/", Astro.site),
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Tous (navigateur web)",
+    inLanguage: SITE.langue,
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "MAD" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: adresseAbsolue("", Astro.site) },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Simulateur solaire loi 82-21",
+        item: adresseAbsolue("solaire-loi-82-21/", Astro.site),
+      },
+    ],
+  },
+];
+---
+
+<Base
+  titre="Simulateur solaire loi 82-21 pour entreprises au Maroc"
+  description="Dimensionnez une installation solaire d'autoproduction selon la loi 82-21 : puissance utile, économies, retour sur investissement et démarche (déclaration, accord du distributeur ou ONEE)."
+  donneesStructurees={donneesStructurees}
+>
+  <section class="section">
+    <div class="conteneur">
+      <p class="surtitre">Autoproduction · loi 82-21 en vigueur depuis le 9 juin 2026</p>
+      <h1>Quelle installation solaire pour votre entreprise ?</h1>
+      <p class="chapeau">
+        Le surplus revendu au réseau est plafonné à 20 % de la production et payé autour de 0,20 DH
+        le kWh. La bonne installation est donc celle qui couvre votre consommation de journée, pas
+        la plus grande possible. Réglez les curseurs : le calcul se met à jour tout seul.
+      </p>
+
+      <div class="disposition">
+        <form id="solaire" class="carte reglages" novalidate>
+          <label class="ligne">
+            <span>Consommation annuelle (kWh)</span>
+            <input name="consommation" inputmode="decimal" value="600000" autocomplete="off" />
+            <small>
+              Somme des kWh pointe, pleines et creuses sur 12 factures. Le{" "}
+              <a href={chemin("diagnostic/")}>diagnostic</a> la calcule pour vous.
+            </small>
+          </label>
+          <label class="ligne">
+            <span>
+              Part consommée en journée <output name="sortieJournee">60 %</output>
+            </span>
+            <input type="range" name="journee" min="10" max="100" step="5" value="60" />
+            <small>
+              Bureaux, commerces, ateliers de jour : 60 à 80 %. Hôtels et cliniques : 45 à 60 %.
+            </small>
+          </label>
+          <label class="ligne">
+            <span>
+              Part de la journée à couvrir <output name="sortieCouverture">80 %</output>
+            </span>
+            <input type="range" name="couverture" min="20" max="100" step="5" value="80" />
+            <small>Au-delà de 80 %, le surplus mal payé réduit la rentabilité.</small>
+          </label>
+          <label class="ligne">
+            <span>Prix installé (DH par Wc)</span>
+            <input name="prix" inputmode="decimal" value="7" autocomplete="off" />
+            <small>
+              Ordre de grandeur pour une installation professionnelle ; à remplacer par vos devis.
+            </small>
+          </label>
+        </form>
+
+        <div class="carte sortie" aria-live="polite">
+          <p class="surtitre">Installation conseillée</p>
+          <p class="principal chiffre">
+            <span data-sortie="puissance"></span> kWc
+          </p>
+          <p class="regime" data-sortie="regime"></p>
+          <dl>
+            <div>
+              <dt>Production annuelle</dt>
+              <dd class="chiffre" data-sortie="production"></dd>
+            </div>
+            <div>
+              <dt>Consommée sur place</dt>
+              <dd class="chiffre" data-sortie="autoconsomme"></dd>
+            </div>
+            <div>
+              <dt>Surplus vendu (max. 20 %)</dt>
+              <dd class="chiffre" data-sortie="vendu"></dd>
+            </div>
+            <div>
+              <dt>Surplus perdu</dt>
+              <dd class="chiffre" data-sortie="perdu"></dd>
+            </div>
+            <div>
+              <dt>Investissement</dt>
+              <dd class="chiffre" data-sortie="investissement"></dd>
+            </div>
+            <div>
+              <dt>Économie annuelle</dt>
+              <dd class="chiffre gain" data-sortie="economie"></dd>
+            </div>
+            <div>
+              <dt>Retour sur investissement</dt>
+              <dd class="chiffre" data-sortie="retour"></dd>
+            </div>
+          </dl>
+          <p id="erreur-solaire" class="erreur" role="alert" hidden>
+            Saisissez une consommation et un prix positifs.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="conteneur prose">
+      <h2>Les hypothèses du calcul</h2>
+      <ul>
+        <li>Production : 1 650 kWh par kWc et par an, une moyenne prudente pour le Maroc.</li>
+        <li>
+          Chaque kWh produit et consommé sur place évite un kWh acheté en heures pleines, soit{" "}
+          {formaterTarif(TARIF_MT_2026.kwhPleinesDh)} DH TTC.
+        </li>
+        <li>Surplus revendu à 0,195 DH le kWh, dans la limite de 20 % de la production.</li>
+        <li>
+          Démarche : déclaration en dessous de {SEUIL_DECLARATION_KW} kW, accord de raccordement du
+          distributeur jusqu'à {formaterNombre(SEUIL_AUTORISATION_KW / 1000)} MW, autorisation de
+          l'ONEE au-delà.
+        </li>
+      </ul>
+      <p class="note">
+        Ce simulateur ne remplace ni une étude de toiture ni un devis. Pour comprendre les règles en
+        détail, lisez notre{" "}
+        <a href={chemin("guides/loi-82-21-autoproduction-entreprise/")}>guide de la loi 82-21</a>.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { trouver } from "../lib/dom";
+  import { formaterDecimal, formaterDh, formaterNombre } from "../lib/format";
+  import { simulerSolaire, type RegimeAutoproduction } from "../lib/solaire";
+  import { lireNombre } from "../lib/saisie";
+
+  const REGIMES: Record<RegimeAutoproduction, string> = {
+    declaration: "Démarche : simple déclaration au distributeur.",
+    "accord-distributeur": "Démarche : accord de raccordement du distributeur (SRM ou ONEE).",
+    "autorisation-onee": "Démarche : autorisation de l'ONEE.",
+  };
+
+  const formulaire = trouver("#solaire", HTMLFormElement);
+  const erreur = trouver("#erreur-solaire", HTMLParagraphElement);
+
+  const valeur = (nom: string): string => {
+    const element = formulaire.elements.namedItem(nom);
+    if (!(element instanceof HTMLInputElement)) throw new Error(`Champ introuvable : ${nom}`);
+    return element.value;
+  };
+
+  const ecrireSortie = (nom: string, texte: string) => {
+    const element = formulaire.elements.namedItem(nom);
+    if (element instanceof HTMLOutputElement) element.value = texte;
+  };
+
+  const afficher = (nom: string, texte: string) => {
+    document.querySelectorAll(`[data-sortie="${nom}"]`).forEach((element) => {
+      element.textContent = texte;
+    });
+  };
+
+  function mettreAJour(): void {
+    const journee = Number(valeur("journee")) / 100;
+    const couverture = Number(valeur("couverture")) / 100;
+    ecrireSortie("sortieJournee", `${Math.round(journee * 100)} %`);
+    ecrireSortie("sortieCouverture", `${Math.round(couverture * 100)} %`);
+
+    const consommation = lireNombre(valeur("consommation"));
+    const prix = lireNombre(valeur("prix"));
+    const valide = consommation !== null && prix !== null && consommation > 0 && prix > 0;
+    erreur.hidden = valide;
+    if (!valide) return;
+
+    const s = simulerSolaire({
+      consommationAnnuelleKwh: consommation,
+      partJournee: journee,
+      tauxCouverture: couverture,
+      prixInstalleDhParWc: prix,
+    });
+    afficher("puissance", formaterNombre(s.puissanceKwc));
+    afficher("regime", REGIMES[s.regime]);
+    afficher("production", `${formaterNombre(s.productionKwh)} kWh`);
+    afficher("autoconsomme", `${formaterNombre(s.autoconsommeKwh)} kWh`);
+    afficher("vendu", `${formaterNombre(s.surplusVenduKwh)} kWh`);
+    afficher("perdu", `${formaterNombre(s.surplusPerduKwh)} kWh`);
+    afficher("investissement", formaterDh(s.investissementDh));
+    afficher("economie", `${formaterDh(s.economieAnnuelleDh)} / an`);
+    afficher(
+      "retour",
+      s.retourAnnees === null ? "Aucun gain" : `${formaterDecimal(s.retourAnnees)} ans`,
+    );
+  }
+
+  formulaire.addEventListener("input", mettreAJour);
+  formulaire.addEventListener("submit", (evenement) => evenement.preventDefault());
+  mettreAJour();
+</script>
+
+<style>
+  .disposition {
+    display: grid;
+    gap: 20px;
+    margin-top: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    align-items: start;
+  }
+
+  .reglages {
+    display: grid;
+    gap: 22px;
+  }
+
+  .ligne {
+    display: grid;
+    gap: 6px;
+  }
+
+  .ligne > span {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: 600;
+  }
+
+  .ligne small {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  input:not([type="range"]) {
+    font: 1.05rem var(--f-data);
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-height: 44px;
+    width: 100%;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    min-height: 32px;
+  }
+
+  output {
+    font-family: var(--f-data);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 0 8px;
+  }
+
+  .sortie {
+    background: var(--meter);
+    color: #fff;
+    border-color: var(--meter);
+  }
+
+  .sortie .surtitre {
+    color: var(--meter-muted);
+  }
+
+  .principal {
+    font-size: clamp(2.4rem, 7vw, 3.4rem);
+    color: var(--meter-ink);
+    font-weight: 600;
+    line-height: 1.1;
+    margin: 0 0 6px;
+  }
+
+  .regime {
+    color: #c4d0e2;
+  }
+
+  dl {
+    margin: 16px 0 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid #22324a;
+    padding-top: 8px;
+  }
+
+  dt {
+    color: #c4d0e2;
+  }
+
+  dd {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .sortie .gain {
+    color: #63d193;
+  }
+
+  .erreur {
+    margin: 12px 0 0;
+    color: #f39573;
+  }
+</style>

@@ -1,0 +1,26 @@
+---
+import Base from "../layouts/Base.astro";
+import { chemin } from "../lib/url";
+---
+
+<Base
+  titre="Page introuvable"
+  description="Cette page n'existe pas ou a été déplacée. Retrouvez le diagnostic gratuit de facture d'électricité et les guides Kahraba Check."
+  nonIndexee
+>
+  <section class="section">
+    <div class="conteneur">
+      <p class="surtitre">Erreur 404</p>
+      <h1>Cette page n'existe pas.</h1>
+      <p class="chapeau">Elle a peut-être été déplacée. Voici où aller :</p>
+      <p>
+        <a class="bouton" href={chemin("diagnostic/")}>
+          Faire mon diagnostic
+        </a>
+        <a class="bouton secondaire" href={chemin()}>
+          Retour à l'accueil
+        </a>
+      </p>
+    </div>
+  </section>
+</Base>

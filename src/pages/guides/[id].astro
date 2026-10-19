@@ -1,0 +1,155 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import { SITE } from "../../config";
+import { adresseAbsolue, chemin } from "../../lib/url";
+
+export async function getStaticPaths() {
+  const guides = await getCollection("guides");
+  return guides.map((guide) => ({ params: { id: guide.id }, props: { guide } }));
+}
+
+interface Props {
+  guide: CollectionEntry<"guides">;
+}
+
+const { guide } = Astro.props;
+const { Content } = await render(guide);
+const { titre, description, publieLe, modifieLe } = guide.data;
+const adresse = adresseAbsolue(`guides/${guide.id}/`, Astro.site);
+const dateIso = (date: Date) => date.toISOString().slice(0, 10);
+const dateLisible = new Intl.DateTimeFormat(SITE.langue, { dateStyle: "long" }).format(
+  modifieLe ?? publieLe,
+);
+
+const autres = (await getCollection("guides"))
+  .filter((autre) => autre.id !== guide.id)
+  .sort((a, b) => a.data.ordre - b.data.ordre);
+
+const donneesStructurees = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: titre,
+    description,
+    inLanguage: SITE.langue,
+    datePublished: dateIso(publieLe),
+    dateModified: dateIso(modifieLe ?? publieLe),
+    mainEntityOfPage: adresse,
+    image: adresseAbsolue("og.png", Astro.site),
+    author: { "@type": "Organization", name: SITE.nom, url: adresseAbsolue("", Astro.site) },
+    publisher: { "@type": "Organization", name: SITE.nom, url: adresseAbsolue("", Astro.site) },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: adresseAbsolue("", Astro.site) },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Guides",
+        item: adresseAbsolue("guides/", Astro.site),
+      },
+      { "@type": "ListItem", position: 3, name: titre, item: adresse },
+    ],
+  },
+];
+---
+
+<Base
+  titre={titre}
+  description={description}
+  type="article"
+  publieLe={dateIso(publieLe)}
+  modifieLe={dateIso(modifieLe ?? publieLe)}
+  donneesStructurees={donneesStructurees}
+>
+  <article class="section">
+    <div class="conteneur">
+      <nav class="fil" aria-label="Fil d'Ariane">
+        <ol>
+          <li>
+            <a href={chemin()}>Accueil</a>
+          </li>
+          <li>
+            <a href={chemin("guides/")}>Guides</a>
+          </li>
+          <li aria-current="page">{titre}</li>
+        </ol>
+      </nav>
+      <header class="prose">
+        <h1>{titre}</h1>
+        <p class="chapeau">{description}</p>
+        <p class="note">
+          Mis à jour le <time datetime={dateIso(modifieLe ?? publieLe)}>{dateLisible}</time>
+        </p>
+      </header>
+      <div class="prose">
+        <Content />
+      </div>
+
+      <aside class="carte appel" aria-label="Diagnostic gratuit">
+        <h2>Combien perd votre entreprise ?</h2>
+        <p>
+          Saisissez vos factures : le diagnostic chiffre la perte en quelques minutes, gratuitement.
+        </p>
+        <a class="bouton" href={chemin("diagnostic/")}>
+          Faire mon diagnostic
+        </a>
+      </aside>
+
+      <nav class="suite" aria-labelledby="titre-suite">
+        <h2 id="titre-suite">Autres guides</h2>
+        <ul>
+          {autres.map((autre) => (
+            <li>
+              <a href={chemin(`guides/${autre.id}/`)}>{autre.data.titre}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .fil ol {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0;
+    margin: 0 0 20px;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .fil li + li::before {
+    content: "/";
+    margin-right: 4px;
+  }
+
+  .appel {
+    max-width: 70ch;
+    margin-top: 40px;
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .suite {
+    margin-top: 40px;
+  }
+
+  .suite h2 {
+    font-size: 1.2rem;
+  }
+
+  .suite ul {
+    padding-left: 1.2em;
+  }
+
+  .suite li + li {
+    margin-top: 6px;
+  }
+</style>

@@ -1,0 +1,203 @@
+---
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource/instrument-sans/400.css";
+import "@fontsource/instrument-sans/600.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/600.css";
+import "../styles/global.css";
+import Seo, { type Props as SeoProps } from "../components/Seo.astro";
+import { SITE } from "../config";
+import { chemin } from "../lib/url";
+
+export type Props = SeoProps;
+
+const NAVIGATION = [
+  { libelle: "Diagnostic", cible: "diagnostic/" },
+  { libelle: "Solaire 82-21", cible: "solaire-loi-82-21/" },
+  { libelle: "Guides", cible: "guides/" },
+] as const;
+
+const page = Astro.url.pathname;
+const annee = new Date(SITE.misAJourLe).getFullYear();
+---
+
+<!doctype html>
+<html lang={SITE.langue}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f1b2b" />
+    <meta name="generator" content={Astro.generator} />
+    <Seo {...Astro.props} />
+  </head>
+  <body>
+    <a class="evitement" href="#contenu">
+      Aller au contenu
+    </a>
+    <header class="entete">
+      <div class="conteneur barre">
+        <a class="marque" href={chemin()} aria-label={`${SITE.nom}, accueil`}>
+          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="#0f1b2b"></rect>
+            <path d="M18 4 8 18h7l-2 10 11-15h-7l1-9Z" fill="#ffd36b"></path>
+          </svg>
+          <span>{SITE.nom}</span>
+        </a>
+        <nav aria-label="Navigation principale">
+          <ul>
+            {NAVIGATION.map(({ libelle, cible }) => {
+              const lien = chemin(cible);
+              return (
+                <li>
+                  <a href={lien} aria-current={page.startsWith(lien) ? "page" : undefined}>
+                    {libelle}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="contenu">
+      <slot />
+    </main>
+
+    <footer class="pied">
+      <div class="conteneur colonnes">
+        <div>
+          <p class="marque-pied">{SITE.nom}</p>
+          <p class="note">
+            Diagnostic indépendant des factures d'électricité des entreprises au Maroc. Les calculs
+            se font dans votre navigateur : vos chiffres ne sont envoyés nulle part.
+          </p>
+        </div>
+        <nav aria-label="Liens du pied de page">
+          <ul>
+            <li>
+              <a href={chemin("diagnostic/")}>Diagnostic gratuit</a>
+            </li>
+            <li>
+              <a href={chemin("solaire-loi-82-21/")}>Simulateur solaire loi 82-21</a>
+            </li>
+            <li>
+              <a href={chemin("guides/")}>Guides</a>
+            </li>
+            <li>
+              <a href={chemin("mentions-legales/")}>Mentions légales</a>
+            </li>
+            <li>
+              <a href={chemin("confidentialite/")}>Confidentialité</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      <div class="conteneur">
+        <p class="note">
+          © {annee} {SITE.nom}. Tarifs et textes vérifiés le {SITE.misAJourLe}.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .evitement {
+    position: absolute;
+    left: 12px;
+    top: -60px;
+    z-index: 10;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .evitement:focus {
+    top: 12px;
+  }
+
+  .entete {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .barre {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 24px;
+    min-height: 64px;
+    padding-block: 10px;
+  }
+
+  .marque {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 1.2rem;
+    text-decoration: none;
+  }
+
+  .entete ul,
+  .pied ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .entete ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+
+  .entete nav a {
+    display: inline-block;
+    padding: 6px 0;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+  }
+
+  .entete nav a:hover,
+  .entete nav a[aria-current="page"] {
+    border-bottom-color: var(--accent);
+  }
+
+  .pied {
+    margin-top: 40px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    padding-block: 36px 20px;
+  }
+
+  .colonnes {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  }
+
+  .marque-pied {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+  }
+
+  .pied li + li {
+    margin-top: 6px;
+  }
+
+  @media print {
+    .entete,
+    .pied,
+    .evitement {
+      display: none;
+    }
+  }
+</style>

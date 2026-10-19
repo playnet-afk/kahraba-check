@@ -1,0 +1,54 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../config";
+import { chemin } from "../lib/url";
+---
+
+<Base
+  titre="Mentions légales"
+  description="Mentions légales du site Kahraba Check : éditeur, hébergement, propriété intellectuelle et limites de responsabilité du diagnostic."
+>
+  <section class="section">
+    <div class="conteneur prose">
+      <h1>Mentions légales</h1>
+
+      <h2>Éditeur</h2>
+      <p>
+        Le site {SITE.nom} est édité par son fondateur, dans le cadre d'un projet en cours de
+        création au Maroc. Les coordonnées de la société seront publiées sur cette page dès son
+        immatriculation.
+      </p>
+
+      <h2>Hébergement</h2>
+      <p>
+        Le site est hébergé par GitHub Pages, service de GitHub, Inc., 88 Colin P. Kelly Jr. Street,
+        San Francisco, CA 94107, États-Unis.
+      </p>
+
+      <h2>Nature des informations</h2>
+      <p>
+        Le diagnostic et le simulateur donnent des estimations à partir des chiffres saisis, des
+        tarifs publiés et d'hypothèses indiquées sur chaque page. Ils ne constituent ni un devis, ni
+        un engagement de résultat, ni un conseil juridique. Les tarifs et conditions de votre
+        distributeur peuvent différer ; tout engagement chiffré suppose l'examen de vos factures
+        originales et de votre contrat.
+      </p>
+      <p>
+        Aucun travail électrique n'est réalisé par {SITE.nom} : les interventions sont confiées à
+        des électriciens et installateurs habilités.
+      </p>
+
+      <h2>Propriété intellectuelle</h2>
+      <p>
+        Les textes, calculs et éléments graphiques du site sont protégés. Toute reproduction
+        substantielle sans autorisation est interdite. Les citations courtes avec lien vers la page
+        d'origine sont les bienvenues.
+      </p>
+
+      <h2>Données personnelles</h2>
+      <p>
+        Voir la <a href={chemin("confidentialite/")}>politique de confidentialité</a>.
+      </p>
+    </div>
+  </section>
+</Base>

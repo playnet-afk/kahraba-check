@@ -1,0 +1,53 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../config";
+---
+
+<Base
+  titre="Politique de confidentialité"
+  description="Kahraba Check ne collecte aucune donnée : le diagnostic se calcule dans votre navigateur, sans compte, sans cookie publicitaire et sans mesure d'audience."
+>
+  <section class="section">
+    <div class="conteneur prose">
+      <h1>Politique de confidentialité</h1>
+      <p class="chapeau">
+        En bref : nous ne collectons rien. Les chiffres que vous saisissez restent sur votre
+        appareil.
+      </p>
+
+      <h2>Les calculs se font dans votre navigateur</h2>
+      <p>
+        Le diagnostic et le simulateur solaire s'exécutent entièrement sur votre appareil. Aucune
+        valeur saisie n'est transmise à {SITE.nom} ni à un tiers.
+      </p>
+
+      <h2>Ce qui est gardé sur votre appareil</h2>
+      <p>
+        Pour vous éviter de tout ressaisir, le tableau du diagnostic est enregistré dans le stockage
+        local de votre navigateur. Il n'en sort jamais. Le bouton « Vider le tableau » l'efface,
+        tout comme la suppression des données du site dans votre navigateur.
+      </p>
+
+      <h2>Pas de cookie, pas de mesure d'audience</h2>
+      <p>
+        Le site n'utilise ni cookie, ni outil de mesure d'audience, ni publicité. Les polices de
+        caractères sont servies par le site lui-même, sans appel à un service tiers.
+      </p>
+
+      <h2>Hébergement</h2>
+      <p>
+        Comme tout hébergeur, GitHub Pages peut enregistrer des données techniques de connexion
+        (adresse IP, date, page demandée) pour assurer la sécurité du service. Ces données sont
+        traitées par GitHub selon sa propre politique de confidentialité.
+      </p>
+
+      <h2>Si vous nous contactez</h2>
+      <p>
+        Si vous nous envoyez vos factures par WhatsApp ou par e-mail, elles servent uniquement à
+        réaliser votre diagnostic et ne sont jamais revendues. Vous pouvez demander leur suppression
+        à tout moment. Ces traitements seront déclarés à la CNDP, conformément à la loi 09-08, avant
+        le démarrage de l'activité commerciale.
+      </p>
+    </div>
+  </section>
+</Base>

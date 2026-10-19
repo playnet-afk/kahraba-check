@@ -1,0 +1,404 @@
+---
+import Base from "../layouts/Base.astro";
+import { SITE } from "../config";
+import { EXEMPLES } from "../data/exemples";
+import { diagnostiquer } from "../lib/diagnostic";
+import { formaterDh, formaterNombre, formaterPourcent } from "../lib/format";
+import { HYPOTHESES, TARIF_MT_2026 } from "../lib/tarifs";
+import { adresseAbsolue, chemin } from "../lib/url";
+
+const exemple = EXEMPLES[0];
+if (exemple === undefined) throw new Error("Aucun exemple de démonstration n'est défini.");
+const resultat = diagnostiquer(exemple);
+
+const FUITES = [
+  {
+    titre: "Puissance souscrite trop haute",
+    texte: `La prime fixe coûte ${formaterNombre(TARIF_MT_2026.primeFixeDhParKvaAn)} DH par kVA et par an, que vous l'utilisiez ou non. Beaucoup de sites paient pour une puissance qu'ils n'atteignent jamais.`,
+  },
+  {
+    titre: "Dépassements de puissance",
+    texte:
+      "À l'inverse, une souscription trop basse fait payer des dépassements chaque mois. Il faut trouver le bon réglage, pas le plus bas.",
+  },
+  {
+    titre: "Pénalités d'énergie réactive",
+    texte:
+      "Moteurs, climatisation et froid consomment de l'énergie réactive. Au-delà du seuil du contrat, elle est facturée. Une batterie de condensateurs la supprime presque entièrement.",
+  },
+  {
+    titre: "Heures de pointe",
+    texte: `Le kWh de pointe coûte ${formaterPourcent(TARIF_MT_2026.kwhPointeDh / TARIF_MT_2026.kwhPleinesDh - 1)} de plus qu'en heures pleines. Décaler quelques usages (eau chaude, froid, pompage) se voit dès la facture suivante.`,
+  },
+] as const;
+
+const FAQ = [
+  {
+    question: "Combien coûte le diagnostic ?",
+    reponse:
+      "Le diagnostic en ligne est gratuit et sans inscription. Si vous nous confiez la récupération des économies, nous sommes payés uniquement sur ce que vous économisez réellement la première année : rien d'économisé, rien à payer.",
+  },
+  {
+    question: "Quelles entreprises sont concernées ?",
+    reponse:
+      "Les sites raccordés en moyenne tension : hôtels, cliniques, chambres froides, ateliers, boulangeries industrielles, écoles privées, centres commerciaux. Si votre facture indique une puissance souscrite en kVA, vous êtes concerné.",
+  },
+  {
+    question: "Mes chiffres sont-ils envoyés quelque part ?",
+    reponse:
+      "Non. Le calcul se fait entièrement dans votre navigateur. Aucune donnée saisie dans l'outil n'est transmise ni enregistrée sur un serveur.",
+  },
+  {
+    question: "Les tarifs utilisés sont-ils officiels ?",
+    reponse: `Nous utilisons la grille moyenne tension de l'ONEE en vigueur en juin 2026. Les distributeurs régionaux (SRM) peuvent appliquer des conditions particulières : le diagnostic donne un ordre de grandeur, que nous confirmons sur vos factures réelles avant tout engagement.`,
+  },
+  {
+    question: "Que change la loi 82-21 sur l'autoproduction ?",
+    reponse:
+      "Depuis le 9 juin 2026, une entreprise peut produire sa propre électricité solaire et revendre une partie du surplus au réseau, dans la limite de 20 % de sa production. Le surplus est payé peu cher : une installation rentable se dimensionne sur la consommation réelle, pas sur la surface du toit.",
+  },
+] as const;
+
+const donneesStructurees = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE.nom,
+    url: adresseAbsolue("", Astro.site),
+    logo: adresseAbsolue("apple-touch-icon.png", Astro.site),
+    description: SITE.description,
+    areaServed: { "@type": "Country", name: "Maroc" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE.nom,
+    url: adresseAbsolue("", Astro.site),
+    inLanguage: SITE.langue,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ.map(({ question, reponse }) => ({
+      "@type": "Question",
+      name: question,
+      acceptedAnswer: { "@type": "Answer", text: reponse },
+    })),
+  },
+];
+---
+
+<Base
+  titre={SITE.nom}
+  description="Votre entreprise paie-t-elle trop d'électricité ? Diagnostic gratuit de vos factures moyenne tension au Maroc, et nous ne sommes payés que sur les économies réalisées."
+  donneesStructurees={donneesStructurees}
+>
+  <section class="section accroche">
+    <div class="conteneur deux-colonnes">
+      <div>
+        <p class="surtitre">Entreprises au Maroc · moyenne tension</p>
+        <h1>
+          Votre facture d'électricité cache souvent des dizaines de milliers de dirhams perdus.
+        </h1>
+        <p class="chapeau">
+          Saisissez vos 12 dernières factures : l'outil chiffre en quelques minutes ce que vous
+          payez en trop sur la puissance, l'énergie réactive et les heures de pointe. Gratuit, sans
+          inscription, et rien ne quitte votre navigateur.
+        </p>
+        <div class="actions">
+          <a class="bouton" href={chemin("diagnostic/")}>
+            Faire mon diagnostic gratuit
+          </a>
+          <a class="bouton secondaire" href={chemin("guides/comprendre-facture-moyenne-tension/")}>
+            Comprendre ma facture
+          </a>
+        </div>
+      </div>
+
+      <aside class="compteur" aria-labelledby="titre-exemple">
+        <p class="libelle" id="titre-exemple">
+          Exemple fictif · {exemple.nom}, {exemple.ville}
+        </p>
+        <p class="montant chiffre">{formaterDh(resultat.perteTotaleDh)}</p>
+        <p class="libelle">perdus chaque année</p>
+        <dl>
+          <div>
+            <dt>Puissance payée en trop</dt>
+            <dd class="chiffre">{formaterDh(resultat.economiePuissanceDh)}</dd>
+          </div>
+          <div>
+            <dt>Énergie réactive évitable</dt>
+            <dd class="chiffre">{formaterDh(resultat.economieReactiveDh)}</dd>
+          </div>
+          <div>
+            <dt>Heures de pointe</dt>
+            <dd class="chiffre">{formaterDh(resultat.economiePointeDh)}</dd>
+          </div>
+        </dl>
+        <p class="libelle">
+          Souscrit : {exemple.puissanceSouscriteKva} kVA · pic atteint : {resultat.puissanceMaxKva}{" "}
+          kVA
+        </p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="titre-fuites">
+    <div class="conteneur">
+      <p class="surtitre">Où part l'argent</p>
+      <h2 id="titre-fuites">Les quatre fuites que nous cherchons sur chaque facture</h2>
+      <div class="grille">
+        {FUITES.map(({ titre, texte }, i) => (
+          <article class="carte">
+            <p class="numero chiffre">0{i + 1}</p>
+            <h3>{titre}</h3>
+            <p>{texte}</p>
+          </article>
+        ))}
+      </div>
+      <p class="note">
+        L'outil signale aussi les relevés estimés et les périodes de facturation anormalement
+        longues, fréquents depuis le passage aux sociétés régionales de distribution (SRM).
+      </p>
+    </div>
+  </section>
+
+  <section class="section bande" aria-labelledby="titre-modele">
+    <div class="conteneur deux-colonnes">
+      <div>
+        <p class="surtitre">Le principe</p>
+        <h2 id="titre-modele">Payé seulement sur ce que vous économisez</h2>
+        <p>
+          Le diagnostic est gratuit. Si vous voulez récupérer cet argent, nous préparons les
+          démarches auprès de votre distributeur (baisse de puissance, réclamation sur les erreurs),
+          nous faisons poser les condensateurs par un électricien habilité et nous vérifions chaque
+          nouvelle facture.
+        </p>
+        <p>
+          Notre rémunération : {formaterPourcent(HYPOTHESES.commission)} des économies de la
+          première année, constatées sur vos factures. Ensuite, tout est pour vous.
+        </p>
+      </div>
+      <ol class="etapes">
+        <li>
+          <strong>Vous saisissez ou nous envoyez vos 12 dernières factures.</strong>
+          <span>Photo ou PDF, le format importe peu.</span>
+        </li>
+        <li>
+          <strong>Nous chiffrons la perte, cause par cause.</strong>
+          <span>Un rapport clair, en dirhams, que vous pouvez montrer à votre direction.</span>
+        </li>
+        <li>
+          <strong>Nous récupérons l'argent et nous vérifions qu'il revient.</strong>
+          <span>Vous ne payez qu'une part des économies réellement constatées.</span>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="titre-solaire">
+    <div class="conteneur deux-colonnes">
+      <div>
+        <p class="surtitre">Nouveau depuis le 9 juin 2026</p>
+        <h2 id="titre-solaire">
+          Le solaire pour les entreprises, dimensionné sur vos vraies factures
+        </h2>
+        <p>
+          La loi 82-21 permet à toute entreprise de produire sa propre électricité. Le surplus
+          revendu est plafonné à 20 % de la production et payé autour de 0,20 DH le kWh, contre près
+          de 1 DH le kWh acheté. Une installation trop grande ne rapporte donc presque rien de plus.
+        </p>
+        <p>
+          Notre simulateur part de votre consommation de journée pour proposer la bonne puissance et
+          indique la démarche à suivre : déclaration, accord du distributeur ou autorisation de
+          l'ONEE.
+        </p>
+        <a class="bouton secondaire" href={chemin("solaire-loi-82-21/")}>
+          Simuler mon installation
+        </a>
+      </div>
+      <div class="carte">
+        <h3>Les trois régimes de la loi 82-21</h3>
+        <ul class="regimes">
+          <li>
+            <span class="chiffre">&lt; 11 kW</span> Simple déclaration au distributeur
+          </li>
+          <li>
+            <span class="chiffre">11 kW à 5 MW</span> Accord de raccordement du distributeur
+          </li>
+          <li>
+            <span class="chiffre">&gt; 5 MW</span> Autorisation de l'ONEE
+          </li>
+        </ul>
+        <a class="lien" href={chemin("guides/loi-82-21-autoproduction-entreprise/")}>
+          Lire le guide complet sur la loi 82-21
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section bande" aria-labelledby="titre-faq">
+    <div class="conteneur prose">
+      <h2 id="titre-faq">Questions fréquentes</h2>
+      {FAQ.map(({ question, reponse }) => (
+        <details>
+          <summary>{question}</summary>
+          <p>{reponse}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+</Base>
+
+<style>
+  .deux-colonnes {
+    display: grid;
+    gap: clamp(24px, 5vw, 56px);
+    align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  }
+
+  .accroche h1 {
+    max-width: 20ch;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .compteur {
+    background: var(--meter);
+    color: #fff;
+    border-radius: 18px;
+    padding: clamp(20px, 4vw, 32px);
+    box-shadow: 0 20px 50px -24px rgb(15 27 43 / 0.6);
+  }
+
+  .compteur .libelle {
+    font-family: var(--f-data);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--meter-muted);
+    margin: 0;
+  }
+
+  .compteur .montant {
+    color: var(--meter-ink);
+    font-size: clamp(2.2rem, 7vw, 3.4rem);
+    font-weight: 600;
+    line-height: 1.1;
+    margin: 10px 0 4px;
+  }
+
+  .compteur dl {
+    margin: 20px 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .compteur dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid #22324a;
+    padding-top: 8px;
+  }
+
+  .compteur dt {
+    color: #c4d0e2;
+  }
+
+  .compteur dd {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .numero {
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  .bande {
+    background: var(--surface);
+    border-block: 1px solid var(--line);
+  }
+
+  .etapes {
+    list-style: none;
+    counter-reset: etape;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+  }
+
+  .etapes li {
+    counter-increment: etape;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 2px 14px;
+  }
+
+  .etapes li::before {
+    content: counter(etape);
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-family: var(--f-data);
+    font-weight: 600;
+  }
+
+  .etapes span {
+    color: var(--muted);
+  }
+
+  .regimes {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+  }
+
+  .regimes li {
+    display: grid;
+    gap: 2px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .regimes .chiffre {
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .regimes .chiffre {
+      color: var(--accent);
+    }
+  }
+
+  details {
+    border-bottom: 1px solid var(--line);
+    padding: 14px 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+
+  details p {
+    margin: 10px 0 0;
+    color: var(--muted);
+  }
+</style>

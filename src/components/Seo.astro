@@ -1,0 +1,71 @@
+---
+import { SITE } from "../config";
+import { adresseAbsolue, chemin } from "../lib/url";
+
+export interface Props {
+  titre: string;
+  description: string;
+  /** Type OpenGraph : « website » pour les pages, « article » pour les guides. */
+  type?: "website" | "article";
+  /** Données structurées schema.org, une ou plusieurs. */
+  donneesStructurees?: Record<string, unknown> | readonly Record<string, unknown>[];
+  publieLe?: string;
+  modifieLe?: string;
+  /** Exclut la page des moteurs de recherche (page 404, par exemple). */
+  nonIndexee?: boolean;
+}
+
+const {
+  titre,
+  description,
+  type = "website",
+  donneesStructurees,
+  publieLe,
+  modifieLe,
+  nonIndexee = false,
+} = Astro.props;
+
+const titreComplet = titre === SITE.nom ? `${SITE.nom} : ${SITE.slogan}` : `${titre} | ${SITE.nom}`;
+const canonique = new URL(Astro.url.pathname, Astro.site).href;
+const image = adresseAbsolue("og.png", Astro.site);
+const blocsJsonLd =
+  donneesStructurees === undefined
+    ? []
+    : Array.isArray(donneesStructurees)
+      ? donneesStructurees
+      : [donneesStructurees];
+// « < » est échappé pour qu'aucun texte ne puisse fermer la balise script.
+const enJson = (valeur: unknown) => JSON.stringify(valeur).replace(/</g, "\\u003c");
+---
+
+<title>{titreComplet}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonique} />
+{nonIndexee && <meta name="robots" content="noindex, follow" />}
+
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={SITE.nom} />
+<meta property="og:locale" content={SITE.locale} />
+<meta property="og:title" content={titreComplet} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonique} />
+<meta property="og:image" content={image} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={`${SITE.nom} : ${SITE.slogan}`} />
+{publieLe && <meta property="article:published_time" content={publieLe} />}
+{modifieLe && <meta property="article:modified_time" content={modifieLe} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={titreComplet} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={image} />
+
+<link rel="icon" href={chemin("favicon.svg")} type="image/svg+xml" />
+<link rel="apple-touch-icon" href={chemin("apple-touch-icon.png")} />
+<link rel="manifest" href={chemin("manifest.webmanifest")} />
+<link rel="sitemap" href={chemin("sitemap-index.xml")} />
+
+{blocsJsonLd.map((bloc) => (
+  <script type="application/ld+json" set:html={enJson(bloc)} />
+))}
