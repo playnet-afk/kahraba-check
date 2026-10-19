@@ -192,6 +192,19 @@ p {
   border-color: var(--ink);
 }
 
+input:not([type="checkbox"], [type="radio"], [type="range"]),
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 44px;
+  max-width: 100%;
+}
+
 .chiffre {
   font-family: var(--f-data);
   font-variant-numeric: tabular-nums;

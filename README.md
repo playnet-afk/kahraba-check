@@ -13,6 +13,7 @@ Site en ligne : https://playnet-afk.github.io/kahraba-check/
 | `/solaire-loi-82-21/`                     | Simulateur d'autoproduction (puissance, surplus, retour, démarche)                     |
 | `/guides/`                                | Guides de référencement : facture MT, puissance souscrite, énergie réactive, loi 82-21 |
 | `/mentions-legales/`, `/confidentialite/` | Pages légales                                                                          |
+| `/admin/`                                 | Espace administrateur : dossiers clients, démarches, documents et suivi des économies  |
 
 Tous les calculs se font dans le navigateur. Le site n'a ni serveur, ni cookie, ni mesure d'audience.
 
@@ -33,6 +34,17 @@ npm run dev        # http://localhost:4321/kahraba-check/
 | `npm run build`  | Génère le site statique dans `dist/`               |
 | `npm run verify` | Tout ce qui précède, comme en intégration continue |
 
+## Espace administrateur
+
+`/admin/` n'est lié depuis aucune page, n'est pas indexé et n'apparaît pas dans le plan du site. Pour chaque dossier client :
+
+1. saisie du client, de l'abonnement et des 12 factures de référence (ou reprise de la saisie du diagnostic public) ;
+2. liste des démarches utiles à ce dossier, cochables, avec le gain attendu de chacune ;
+3. documents générés à partir de l'analyse, prêts à imprimer ou à enregistrer en PDF : rapport, contrat de mission et mandat, lettre de modification de puissance, lettre de réclamation, demande de devis condensateurs, plan heures de pointe, état des économies ;
+4. suivi des factures reçues après les démarches, économies constatées et commission restant à facturer.
+
+Les dossiers sont enregistrés dans le stockage local du navigateur, jamais sur un serveur. La page n'a donc pas de mot de passe : une autre personne qui l'ouvre voit un outil vide. Les boutons Exporter et Importer servent de sauvegarde et de transfert entre appareils.
+
 ## Organisation du code
 
 ```
@@ -43,6 +55,10 @@ src/
   lib/solaire.ts       simulation d'autoproduction et régimes de la loi 82-21
   lib/saisie.ts        lecture des nombres tapés à la française
   lib/rapport.ts       conseils et anomalies en phrases lisibles
+  lib/demarches.ts     démarches à mener selon l'analyse
+  lib/documents.ts     contenu des documents de démarche
+  lib/suivi.ts         économies constatées et commission
+  scripts/admin.ts     comportement de l'espace administrateur
   data/exemples.ts     trois établissements fictifs pour la démonstration
   content/guides/      guides en Markdown (titre, description, dates dans l'en-tête)
   pages/               une page Astro par adresse

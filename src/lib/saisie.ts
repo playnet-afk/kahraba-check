@@ -1,4 +1,4 @@
-import type { ReleveMensuel } from "./diagnostic";
+import type { ReleveMensuel, Site } from "./diagnostic";
 
 /**
  * Lit un nombre tapé à la française : « 12 500,5 », « 12500.5 » ou « 12 500 DH ».
@@ -104,4 +104,45 @@ export function lireLignes(lignes: readonly LigneSaisie[]): ResultatLecture {
     erreurs.push("Renseignez au moins une facture.");
   }
   return erreurs.length > 0 ? { ok: false, erreurs } : { ok: true, releves };
+}
+
+/** Le tableau complet tel que saisi : puissance souscrite et une ligne par facture. */
+export interface SaisieFactures {
+  readonly puissanceSouscriteKva: string;
+  readonly lignes: readonly LigneSaisie[];
+}
+
+export type ResultatSaisie =
+  { readonly ok: true; readonly site: Site } | { readonly ok: false; readonly erreurs: string[] };
+
+/** Valide la saisie complète et la transforme en site prêt pour le diagnostic. */
+export function lireSaisie(saisie: SaisieFactures): ResultatSaisie {
+  const souscrite = lireNombre(saisie.puissanceSouscriteKva);
+  const lecture = lireLignes(saisie.lignes);
+  const erreurs: string[] = [];
+  if (souscrite === null || Number.isNaN(souscrite) || souscrite <= 0) {
+    erreurs.push("Indiquez la puissance souscrite en kVA (elle figure en haut de la facture).");
+  }
+  if (!lecture.ok) erreurs.push(...lecture.erreurs);
+  if (souscrite === null || !lecture.ok || erreurs.length > 0) return { ok: false, erreurs };
+  return { ok: true, site: { puissanceSouscriteKva: souscrite, releves: lecture.releves } };
+}
+
+/** Transforme des relevés connus (exemples, dossiers) en lignes de saisie. */
+export function saisieDepuisSite(site: Site): SaisieFactures {
+  return {
+    puissanceSouscriteKva: String(site.puissanceSouscriteKva),
+    lignes: site.releves.map((r) => ({
+      mois: r.mois,
+      jours: String(r.jours),
+      releveEstime: r.releveEstime,
+      kwhPointe: String(r.kwhPointe),
+      kwhPleines: String(r.kwhPleines),
+      kwhCreuses: String(r.kwhCreuses),
+      puissanceMaxKva: String(r.puissanceMaxKva),
+      penaliteReactiveDh: String(r.penaliteReactiveDh),
+      depassementDh: String(r.depassementDh),
+      totalTtcDh: r.totalTtcDh === undefined ? "" : String(r.totalTtcDh),
+    })),
+  };
 }

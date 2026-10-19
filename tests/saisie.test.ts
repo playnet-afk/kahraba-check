@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { lireLignes, lireNombre, type LigneSaisie } from "../src/lib/saisie";
+import { EXEMPLES } from "../src/data/exemples";
+import {
+  lireLignes,
+  lireNombre,
+  lireSaisie,
+  saisieDepuisSite,
+  type LigneSaisie,
+} from "../src/lib/saisie";
 
 const ligneVide: LigneSaisie = {
   mois: "",
@@ -81,5 +88,22 @@ describe("lireLignes", () => {
       ok: false,
       erreurs: ["Renseignez au moins une facture."],
     });
+  });
+});
+
+describe("lireSaisie", () => {
+  it("exige une puissance souscrite positive", () => {
+    const resultat = lireSaisie({ puissanceSouscriteKva: "0", lignes: [ligne({})] });
+    expect(resultat.ok).toBe(false);
+  });
+
+  it("retrouve un exemple après un aller-retour par la saisie", () => {
+    for (const exemple of EXEMPLES) {
+      const resultat = lireSaisie(saisieDepuisSite(exemple));
+      expect(resultat).toEqual({
+        ok: true,
+        site: { puissanceSouscriteKva: exemple.puissanceSouscriteKva, releves: exemple.releves },
+      });
+    }
   });
 });

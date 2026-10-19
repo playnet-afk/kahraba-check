@@ -1,26 +1,11 @@
 ---
+import TableauFactures from "../components/TableauFactures.astro";
 import Base from "../layouts/Base.astro";
 import { SITE } from "../config";
 import { EXEMPLES } from "../data/exemples";
 import { formaterPourcent, formaterTarif } from "../lib/format";
 import { HYPOTHESES, SOURCE_TARIF, TARIF_MT_2026 } from "../lib/tarifs";
 import { adresseAbsolue } from "../lib/url";
-
-const LIGNES = 12;
-const COLONNES = [
-  { champ: "jours", libelle: "Jours", aide: "Nombre de jours de la période" },
-  { champ: "kwhPointe", libelle: "kWh pointe", aide: "Énergie active en heures de pointe" },
-  { champ: "kwhPleines", libelle: "kWh pleines", aide: "Énergie active en heures pleines" },
-  { champ: "kwhCreuses", libelle: "kWh creuses", aide: "Énergie active en heures creuses" },
-  { champ: "puissanceMaxKva", libelle: "Pmax (kVA)", aide: "Puissance maximale atteinte" },
-  { champ: "penaliteReactiveDh", libelle: "Réactive (DH)", aide: "Pénalité d'énergie réactive" },
-  { champ: "depassementDh", libelle: "Dépass. (DH)", aide: "Dépassements de puissance facturés" },
-  {
-    champ: "totalTtcDh",
-    libelle: "Total TTC (DH)",
-    aide: "Montant total de la facture, facultatif",
-  },
-] as const;
 
 const donneesStructurees = {
   "@context": "https://schema.org",
@@ -82,55 +67,7 @@ const donneesStructurees = {
           </div>
         </div>
 
-        <div class="defilement" role="region" aria-label="Tableau des factures" tabindex="0">
-          <table>
-            <caption class="visuellement-cache">Une ligne par facture mensuelle</caption>
-            <thead>
-              <tr>
-                <th scope="col">Mois</th>
-                {COLONNES.map(({ libelle, aide }) => (
-                  <th scope="col" title={aide}>
-                    {libelle}
-                  </th>
-                ))}
-                <th scope="col" title="Cochez si la facture indique un relevé estimé">
-                  Estimé
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: LIGNES }, (_, i) => (
-                <tr data-ligne={i}>
-                  <td>
-                    <input
-                      name={`mois-${i}`}
-                      aria-label={`Mois de la facture ${i + 1}`}
-                      placeholder={`Mois ${i + 1}`}
-                      autocomplete="off"
-                    />
-                  </td>
-                  {COLONNES.map(({ champ, aide }) => (
-                    <td>
-                      <input
-                        name={`${champ}-${i}`}
-                        aria-label={`${aide}, facture ${i + 1}`}
-                        inputmode="decimal"
-                        autocomplete="off"
-                      />
-                    </td>
-                  ))}
-                  <td class="case">
-                    <input
-                      type="checkbox"
-                      name={`releveEstime-${i}`}
-                      aria-label={`Relevé estimé, facture ${i + 1}`}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TableauFactures prefixe="" />
 
         <div id="erreurs" class="erreurs" role="alert" hidden></div>
 
@@ -269,10 +206,9 @@ const donneesStructurees = {
   import { DonneesInvalides, diagnostiquer, type Diagnostic } from "../lib/diagnostic";
   import { formaterDh, formaterNombre, formaterPourcent } from "../lib/format";
   import { conseils, decrireAnomalie } from "../lib/rapport";
-  import { CHAMPS_SAISIS, lireLignes, lireNombre, type LigneSaisie } from "../lib/saisie";
-
-  const CLE_BROUILLON = "kahraba-check:diagnostic";
-  const LIGNES = 12;
+  import { lireSaisie, saisieDepuisSite, type SaisieFactures } from "../lib/saisie";
+  import { CLES, ecrireJson, lireJson, supprimer } from "../lib/stockage";
+  import { lireTableau, remplirTableau } from "../lib/tableau-factures";
 
   const formulaire = trouver("#formulaire", HTMLFormElement);
   const selectExemple = trouver("#exemple", HTMLSelectElement);
@@ -287,87 +223,23 @@ const donneesStructurees = {
   const lienWa = trouver("#contact-whatsapp", HTMLAnchorElement);
   const lienMail = trouver("#contact-email", HTMLAnchorElement);
 
-  const champ = (nom: string): HTMLInputElement => {
-    const element = formulaire.elements.namedItem(nom);
-    if (!(element instanceof HTMLInputElement)) throw new Error(`Champ introuvable : ${nom}`);
-    return element;
-  };
-
-  interface Brouillon {
-    puissanceSouscriteKva: string;
-    lignes: LigneSaisie[];
-  }
-
-  function lireFormulaire(): Brouillon {
-    const lignes = Array.from({ length: LIGNES }, (_, i): LigneSaisie => {
-      const valeurs = Object.fromEntries(
-        CHAMPS_SAISIS.map((nom) => [nom, champ(`${nom}-${i}`).value]),
-      ) as Record<(typeof CHAMPS_SAISIS)[number], string>;
-      return {
-        ...valeurs,
-        mois: champ(`mois-${i}`).value,
-        releveEstime: champ(`releveEstime-${i}`).checked,
-      };
-    });
-    return { puissanceSouscriteKva: champ("puissanceSouscriteKva").value, lignes };
-  }
-
-  function remplirFormulaire(brouillon: Brouillon): void {
-    champ("puissanceSouscriteKva").value = brouillon.puissanceSouscriteKva;
-    for (let i = 0; i < LIGNES; i++) {
-      const ligne = brouillon.lignes[i];
-      champ(`mois-${i}`).value = ligne?.mois ?? "";
-      champ(`releveEstime-${i}`).checked = ligne?.releveEstime ?? false;
-      for (const nom of CHAMPS_SAISIS) {
-        champ(`${nom}-${i}`).value = ligne?.[nom] ?? "";
-      }
-    }
-  }
-
-  // Le stockage local peut être bloqué (navigation privée, réglages) : l'outil fonctionne sans.
   function enregistrerBrouillon(): void {
-    try {
-      localStorage.setItem(CLE_BROUILLON, JSON.stringify(lireFormulaire()));
-    } catch {
-      /* stockage indisponible */
-    }
+    ecrireJson(CLES.brouillonDiagnostic, lireTableau(formulaire));
   }
 
   function restaurerBrouillon(): void {
+    const brouillon = lireJson(CLES.brouillonDiagnostic) as SaisieFactures | null;
+    if (brouillon === null) return;
     try {
-      const brut = localStorage.getItem(CLE_BROUILLON);
-      if (brut !== null) remplirFormulaire(JSON.parse(brut) as Brouillon);
+      remplirTableau(formulaire, brouillon);
     } catch {
-      /* brouillon absent ou illisible */
-    }
-  }
-
-  function effacerBrouillon(): void {
-    try {
-      localStorage.removeItem(CLE_BROUILLON);
-    } catch {
-      /* stockage indisponible */
+      supprimer(CLES.brouillonDiagnostic);
     }
   }
 
   function chargerExemple(id: string): void {
     const exemple = EXEMPLES.find((e) => e.id === id);
-    if (exemple === undefined) return;
-    remplirFormulaire({
-      puissanceSouscriteKva: String(exemple.puissanceSouscriteKva),
-      lignes: exemple.releves.map((r) => ({
-        mois: r.mois,
-        jours: String(r.jours),
-        releveEstime: r.releveEstime,
-        kwhPointe: String(r.kwhPointe),
-        kwhPleines: String(r.kwhPleines),
-        kwhCreuses: String(r.kwhCreuses),
-        puissanceMaxKva: String(r.puissanceMaxKva),
-        penaliteReactiveDh: String(r.penaliteReactiveDh),
-        depassementDh: String(r.depassementDh),
-        totalTtcDh: r.totalTtcDh === undefined ? "" : String(r.totalTtcDh),
-      })),
-    });
+    if (exemple !== undefined) remplirTableau(formulaire, saisieDepuisSite(exemple));
   }
 
   function afficherErreurs(erreurs: readonly string[]): void {
@@ -457,23 +329,13 @@ const donneesStructurees = {
   }
 
   function calculer(): void {
-    const saisie = lireFormulaire();
-    const souscrite = lireNombre(saisie.puissanceSouscriteKva);
-    const lecture = lireLignes(saisie.lignes);
-    const erreurs: string[] = [];
-    if (souscrite === null || Number.isNaN(souscrite) || souscrite <= 0) {
-      erreurs.push("Indiquez la puissance souscrite en kVA (elle figure en haut de la facture).");
-    }
-    if (!lecture.ok) erreurs.push(...lecture.erreurs);
-    if (erreurs.length > 0 || souscrite === null || !lecture.ok) {
-      afficherErreurs(erreurs);
+    const lecture = lireSaisie(lireTableau(formulaire));
+    if (!lecture.ok) {
+      afficherErreurs(lecture.erreurs);
       return;
     }
     try {
-      afficherResultat(
-        diagnostiquer({ puissanceSouscriteKva: souscrite, releves: lecture.releves }),
-        souscrite,
-      );
+      afficherResultat(diagnostiquer(lecture.site), lecture.site.puissanceSouscriteKva);
     } catch (erreur) {
       if (erreur instanceof DonneesInvalides) afficherErreurs(erreur.erreurs);
       else throw erreur;
@@ -496,7 +358,7 @@ const donneesStructurees = {
   });
   boutonVider.addEventListener("click", () => {
     formulaire.reset();
-    effacerBrouillon();
+    supprimer(CLES.brouillonDiagnostic);
     blocResultat.hidden = true;
     blocErreurs.hidden = true;
   });
@@ -544,78 +406,6 @@ const donneesStructurees = {
 
   .outils select {
     width: 100%;
-  }
-
-  input,
-  select {
-    font: inherit;
-    color: var(--ink);
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 10px;
-    min-height: 44px;
-  }
-
-  select {
-    max-width: 100%;
-  }
-
-  .defilement {
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-  }
-
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    min-width: 980px;
-  }
-
-  th {
-    font-size: 0.78rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--muted);
-    padding: 10px 6px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--line);
-    white-space: nowrap;
-  }
-
-  td {
-    padding: 4px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  tbody tr:last-child td {
-    border-bottom: 0;
-  }
-
-  td input:not([type="checkbox"]) {
-    width: 100%;
-    min-width: 76px;
-    min-height: 38px;
-    padding: 6px 8px;
-    font-family: var(--f-data);
-    font-size: 0.88rem;
-  }
-
-  td:first-child input {
-    min-width: 110px;
-    font-family: var(--f-body);
-  }
-
-  .case {
-    text-align: center;
-  }
-
-  .case input {
-    width: 20px;
-    height: 20px;
-    min-height: 0;
-    accent-color: var(--accent);
   }
 
   .erreurs {

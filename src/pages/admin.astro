@@ -1,0 +1,617 @@
+---
+import TableauFactures from "../components/TableauFactures.astro";
+import Base from "../layouts/Base.astro";
+import { EXEMPLES } from "../data/exemples";
+
+const DISTRIBUTEURS = [
+  "ONEE",
+  "SRM Casablanca-Settat",
+  "SRM Marrakech-Safi",
+  "SRM Souss-Massa",
+  "SRM Oriental",
+] as const;
+
+const CHAMPS_PRESTATAIRE = [
+  { champ: "nom", libelle: "Votre nom" },
+  { champ: "raisonSociale", libelle: "Raison sociale" },
+  { champ: "adresse", libelle: "Adresse" },
+  { champ: "ville", libelle: "Ville" },
+  { champ: "telephone", libelle: "Téléphone" },
+  { champ: "email", libelle: "E-mail" },
+  { champ: "ice", libelle: "ICE" },
+  { champ: "rc", libelle: "RC" },
+] as const;
+
+const CHAMPS_CLIENT = [
+  { chemin: "client.raisonSociale", libelle: "Raison sociale" },
+  { chemin: "client.representant", libelle: "Représentant (signataire)" },
+  { chemin: "client.fonction", libelle: "Fonction du représentant" },
+  { chemin: "client.adresse", libelle: "Adresse du siège" },
+  { chemin: "client.ville", libelle: "Ville" },
+  { chemin: "client.ice", libelle: "ICE" },
+  { chemin: "client.telephone", libelle: "Téléphone" },
+  { chemin: "client.email", libelle: "E-mail" },
+  { chemin: "abonnement.referenceContrat", libelle: "N° de contrat d'abonnement" },
+  { chemin: "abonnement.adresseSite", libelle: "Adresse du site (si différente)" },
+] as const;
+
+const CHAMPS_SUIVI = [
+  { champ: "puissanceSouscriteKva", libelle: "Puissance souscrite (kVA)" },
+  { champ: "kwhPointe", libelle: "kWh pointe" },
+  { champ: "kwhPleines", libelle: "kWh pleines" },
+  { champ: "kwhCreuses", libelle: "kWh creuses" },
+  { champ: "penaliteReactiveDh", libelle: "Pénalité réactive (DH)" },
+  { champ: "depassementDh", libelle: "Dépassements (DH)" },
+] as const;
+---
+
+<Base
+  titre="Espace administrateur"
+  description="Espace de travail Kahraba Check : dossiers clients, démarches à mener et documents préparés à partir de chaque analyse."
+  nonIndexee
+>
+  <section class="section">
+    <div class="conteneur">
+      <p class="surtitre">Espace administrateur</p>
+      <h1>Dossiers clients et démarches</h1>
+      <p class="chapeau">
+        Chaque dossier part des factures du client. L'outil en déduit les démarches utiles et
+        prépare les documents correspondants, prêts à imprimer.
+      </p>
+      <p class="avertissement">
+        Les dossiers sont enregistrés uniquement dans ce navigateur, sur cet appareil. Rien n'est
+        envoyé sur internet. Exportez une sauvegarde régulièrement et avant de changer d'appareil.
+      </p>
+
+      <div class="carte barre-dossiers">
+        <label class="champ">
+          <span>Dossier ouvert</span>
+          <select id="choix-dossier"></select>
+        </label>
+        <div class="boutons">
+          <button type="button" class="bouton" id="nouveau">
+            Nouveau dossier
+          </button>
+          <button type="button" class="bouton secondaire" id="supprimer">
+            Supprimer
+          </button>
+          <button type="button" class="bouton secondaire" id="exporter">
+            Exporter
+          </button>
+          <label class="bouton secondaire">
+            Importer
+            <input type="file" id="importer" accept="application/json,.json" hidden />
+          </label>
+        </div>
+        <p id="message-sauvegarde" class="note" role="status"></p>
+      </div>
+
+      <details class="carte" id="bloc-prestataire">
+        <summary>Mes informations, reprises sur les contrats et courriers</summary>
+        <form id="form-prestataire" class="grille-champs" novalidate>
+          {CHAMPS_PRESTATAIRE.map(({ champ, libelle }) => (
+            <label class="champ">
+              <span>{libelle}</span>
+              <input data-champ={champ} autocomplete="off" />
+            </label>
+          ))}
+        </form>
+      </details>
+
+      <p id="sans-dossier" class="carte vide">
+        Aucun dossier pour l'instant. Cliquez sur « Nouveau dossier » pour commencer.
+      </p>
+
+      <div id="espace-dossier" hidden>
+        <form id="form-dossier" class="carte" novalidate>
+          <h2>1. Client et abonnement</h2>
+          <div class="grille-champs">
+            {CHAMPS_CLIENT.map(({ chemin, libelle }) => (
+              <label class="champ">
+                <span>{libelle}</span>
+                <input data-chemin={chemin} autocomplete="off" />
+              </label>
+            ))}
+            <label class="champ">
+              <span>Distributeur</span>
+              <input
+                data-chemin="abonnement.distributeur"
+                list="distributeurs"
+                autocomplete="off"
+              />
+              <datalist id="distributeurs">
+                {DISTRIBUTEURS.map((nom) => (
+                  <option value={nom} />
+                ))}
+              </datalist>
+            </label>
+            <label class="champ">
+              <span>Votre commission (% des économies)</span>
+              <input data-chemin="tauxCommission" inputmode="decimal" autocomplete="off" />
+            </label>
+          </div>
+
+          <h2>2. Factures de référence (12 derniers mois)</h2>
+          <div class="entete-factures">
+            <label class="champ">
+              <span>Puissance souscrite (kVA)</span>
+              <input name="ref-puissanceSouscriteKva" inputmode="decimal" autocomplete="off" />
+            </label>
+            <div class="boutons">
+              <button type="button" class="bouton secondaire" id="reprendre-diagnostic">
+                Reprendre la saisie du diagnostic
+              </button>
+              <label class="champ">
+                <span class="visuellement-cache">Remplir avec un exemple fictif</span>
+                <select id="exemple-dossier">
+                  <option value="">Remplir avec un exemple…</option>
+                  {EXEMPLES.map((e) => (
+                    <option value={e.id}>{e.nom}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+          <TableauFactures prefixe="ref-" />
+          <div id="erreurs-dossier" class="erreurs" role="status" hidden></div>
+        </form>
+
+        <section id="bloc-analyse" class="carte" aria-labelledby="titre-analyse" hidden>
+          <h2 id="titre-analyse">3. Résultat de l'analyse</h2>
+          <dl class="resume" id="resume"></dl>
+        </section>
+
+        <section id="bloc-etapes" class="carte" aria-labelledby="titre-etapes" hidden>
+          <div class="titre-avec-compteur">
+            <h2 id="titre-etapes">4. Démarches à mener</h2>
+            <p id="avancement" class="note"></p>
+          </div>
+          <ol id="etapes" class="etapes"></ol>
+        </section>
+
+        <section id="bloc-suivi" class="carte" aria-labelledby="titre-suivi" hidden>
+          <h2 id="titre-suivi">5. Suivi des économies et facturation</h2>
+          <p class="note">
+            Saisissez chaque facture reçue après les démarches. Elle est comparée au même mois de
+            l'année de référence.
+          </p>
+          <form id="form-suivi" class="grille-champs" novalidate>
+            <label class="champ">
+              <span>Mois de la nouvelle facture</span>
+              <input name="mois" placeholder="ex. Oct. 2026" autocomplete="off" />
+            </label>
+            <label class="champ">
+              <span>Comparée au mois de référence</span>
+              <select name="indexReference"></select>
+            </label>
+            {CHAMPS_SUIVI.map(({ champ, libelle }) => (
+              <label class="champ">
+                <span>{libelle}</span>
+                <input name={champ} inputmode="decimal" autocomplete="off" />
+              </label>
+            ))}
+            <div class="champ action-suivi">
+              <button type="submit" class="bouton">
+                Ajouter la facture
+              </button>
+            </div>
+          </form>
+          <p id="erreurs-suivi" class="erreurs" role="alert" hidden></p>
+          <div class="defilement-simple">
+            <table id="table-suivi">
+              <thead>
+                <tr>
+                  <th scope="col">Facture</th>
+                  <th scope="col">Comparée à</th>
+                  <th scope="col">Économie du mois</th>
+                  <th scope="col">
+                    <span class="visuellement-cache">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <dl class="resume" id="bilan"></dl>
+          <label class="champ deja-facture">
+            <span>Commission déjà facturée (DH)</span>
+            <input id="deja-facture" inputmode="decimal" autocomplete="off" />
+          </label>
+        </section>
+
+        <section id="bloc-document" class="carte" aria-labelledby="titre-document" hidden>
+          <div class="titre-avec-compteur">
+            <h2 id="titre-document"></h2>
+            <div class="boutons">
+              <button type="button" class="bouton" id="imprimer-document">
+                Imprimer ou enregistrer en PDF
+              </button>
+              <button type="button" class="bouton secondaire" id="fermer-document">
+                Fermer
+              </button>
+            </div>
+          </div>
+          <p id="manquants" class="avertissement" hidden></p>
+          <article id="apercu" class="document"></article>
+        </section>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../scripts/admin";
+</script>
+
+<style>
+  .avertissement {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    max-width: 75ch;
+  }
+
+  .carte {
+    margin-top: 20px;
+  }
+
+  .carte h2 {
+    font-size: 1.3rem;
+    margin-top: 8px;
+  }
+
+  .carte h2:not(:first-child) {
+    margin-top: 28px;
+  }
+
+  .barre-dossiers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 16px;
+  }
+
+  .barre-dossiers .champ {
+    flex: 1 1 260px;
+  }
+
+  .barre-dossiers .note {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  .boutons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .champ {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .champ > span {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .grille-champs {
+    display: grid;
+    gap: 14px 18px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+    margin-top: 14px;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .vide {
+    color: var(--muted);
+  }
+
+  .entete-factures {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .erreurs {
+    margin-top: 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--loss-soft);
+    border: 1px solid var(--loss);
+  }
+
+  .erreurs :global(ul) {
+    margin: 6px 0 0;
+    padding-left: 1.2em;
+  }
+
+  .resume {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    margin: 12px 0 0;
+  }
+
+  .resume :global(div) {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .resume :global(dt) {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .resume :global(dd) {
+    margin: 4px 0 0;
+    font-family: var(--f-data);
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+
+  .titre-avec-compteur {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+
+  .titre-avec-compteur h2 {
+    margin: 0;
+  }
+
+  .titre-avec-compteur .note {
+    margin: 0;
+  }
+
+  .etapes {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  .etapes :global(li) {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .etapes :global(li.faite) {
+    background: var(--gain-soft);
+    border-color: var(--gain);
+  }
+
+  .etapes :global(.entete-etape) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px 16px;
+    align-items: baseline;
+  }
+
+  .etapes :global(label) {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .etapes :global(input[type="checkbox"]) {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--gain);
+    flex: none;
+  }
+
+  .etapes :global(.qui) {
+    margin: 4px 0 0 28px;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .etapes :global(ul) {
+    margin: 8px 0 0 28px;
+    padding-left: 1.1em;
+    font-size: 0.95rem;
+  }
+
+  .etapes :global(.documents) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 0 28px;
+  }
+
+  .etapes :global(.documents button) {
+    min-height: 38px;
+    padding: 6px 14px;
+    font-size: 0.92rem;
+  }
+
+  .action-suivi {
+    align-content: end;
+  }
+
+  .defilement-simple {
+    position: relative;
+    overflow-x: auto;
+    margin-top: 16px;
+  }
+
+  #table-suivi {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 460px;
+  }
+
+  #table-suivi :global(th),
+  #table-suivi :global(td) {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  #table-suivi :global(th) {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  #table-suivi :global(button) {
+    font: inherit;
+    font-size: 0.85rem;
+    background: none;
+    border: 0;
+    color: var(--loss);
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .deja-facture {
+    max-width: 280px;
+    margin-top: 16px;
+  }
+
+  .document {
+    margin-top: 18px;
+    background: #fff;
+    color: #111;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: clamp(18px, 5vw, 48px);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    max-width: 820px;
+  }
+
+  .document :global(p) {
+    margin: 0 0 0.8em;
+  }
+
+  .document :global(.doc-entete) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px 40px;
+    margin-bottom: 28px;
+  }
+
+  .document :global(.doc-entete p) {
+    margin: 0;
+  }
+
+  .document :global(.doc-entete > div:last-child) {
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .document :global(.doc-titre) {
+    font-size: 1.35rem;
+    text-align: center;
+    margin: 8px 0 20px;
+  }
+
+  .document :global(.doc-sous-titre) {
+    font-family: var(--f-body);
+    font-size: 1rem;
+    margin: 18px 0 6px;
+  }
+
+  .document :global(ul) {
+    margin: 0 0 1em;
+    padding-left: 1.3em;
+  }
+
+  .document :global(.doc-tableau) {
+    overflow-x: auto;
+    margin: 0 0 1em;
+  }
+
+  .document :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.88rem;
+  }
+
+  .document :global(th),
+  .document :global(td) {
+    border: 1px solid #c9ced6;
+    padding: 5px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .document :global(th) {
+    background: #f1f3f6;
+  }
+
+  .document :global(.doc-signatures) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 48px;
+    margin-top: 28px;
+  }
+
+  .document :global(.doc-signatures p) {
+    flex: 1 1 220px;
+    white-space: pre-line;
+    min-height: 110px;
+    border-top: 1px solid #c9ced6;
+    padding-top: 8px;
+  }
+
+  .document :global(.doc-note) {
+    font-size: 0.82rem;
+    color: #555;
+    margin-top: 16px;
+  }
+
+  .document :global(mark) {
+    background: #fde68a;
+    color: #111;
+    padding: 0 2px;
+    border-radius: 3px;
+  }
+
+  /* À l'impression, seul le document ouvert est gardé. */
+  @media print {
+    :global(body.impression-document) .section {
+      padding: 0;
+    }
+
+    :global(body.impression-document) .conteneur > :not(#espace-dossier),
+    :global(body.impression-document) #espace-dossier > :not(#bloc-document),
+    :global(body.impression-document) #bloc-document > :not(#apercu) {
+      display: none;
+    }
+
+    :global(body.impression-document) #bloc-document,
+    :global(body.impression-document) #apercu {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      max-width: none;
+      font-size: 10.5pt;
+    }
+
+    :global(body.impression-document) .document :global(mark) {
+      background: none;
+    }
+  }
+</style>

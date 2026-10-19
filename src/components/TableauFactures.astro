@@ -1,0 +1,120 @@
+---
+import { COLONNES_FACTURES, NB_FACTURES, nomChamp } from "../lib/tableau-factures";
+
+export interface Props {
+  /** Préfixe des noms de champs, pour placer deux tableaux sur la même page. */
+  prefixe?: string;
+}
+
+const { prefixe = "" } = Astro.props;
+---
+
+<div class="defilement" role="region" aria-label="Tableau des factures" tabindex="0">
+  <table>
+    <caption class="visuellement-cache">Une ligne par facture mensuelle</caption>
+    <thead>
+      <tr>
+        <th scope="col">Mois</th>
+        {COLONNES_FACTURES.map(({ libelle, aide }) => (
+          <th scope="col" title={aide}>
+            {libelle}
+          </th>
+        ))}
+        <th scope="col" title="Cochez si la facture indique un relevé estimé">
+          Estimé
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {Array.from({ length: NB_FACTURES }, (_, i) => (
+        <tr>
+          <td>
+            <input
+              name={nomChamp(prefixe, "mois", i)}
+              aria-label={`Mois de la facture ${i + 1}`}
+              placeholder={`Mois ${i + 1}`}
+              autocomplete="off"
+            />
+          </td>
+          {COLONNES_FACTURES.map(({ champ, aide }) => (
+            <td>
+              <input
+                name={nomChamp(prefixe, champ, i)}
+                aria-label={`${aide}, facture ${i + 1}`}
+                inputmode="decimal"
+                autocomplete="off"
+              />
+            </td>
+          ))}
+          <td class="case">
+            <input
+              type="checkbox"
+              name={nomChamp(prefixe, "releveEstime", i)}
+              aria-label={`Relevé estimé, facture ${i + 1}`}
+            />
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .defilement {
+    position: relative;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 980px;
+  }
+
+  th {
+    font-size: 0.78rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 10px 6px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td input:not([type="checkbox"]) {
+    width: 100%;
+    min-width: 76px;
+    min-height: 38px;
+    padding: 6px 8px;
+    font-family: var(--f-data);
+    font-size: 0.88rem;
+  }
+
+  td:first-child input {
+    min-width: 110px;
+    font-family: var(--f-body);
+  }
+
+  .case {
+    text-align: center;
+  }
+
+  .case input {
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    accent-color: var(--accent);
+  }
+</style>
